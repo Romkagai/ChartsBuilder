@@ -53,7 +53,7 @@ public:
 
 private slots:
     void on_selectionTreeChangedSlot(const QItemSelection &selected, const QItemSelection &deselected);
-    void on_selectionTableChangedSlot(const QItemSelection &selected, const QItemSelection &deselected);
+    void on_selectionListChangedSlot(const QItemSelection &selected, const QItemSelection &deselected);
     void comboBoxItemSelected(int index);
     void onCheckBoxStateChanged(int state);
 
@@ -66,13 +66,13 @@ private:
     QFileSystemModel *rightPartModel;
     QFileSystemModel *leftPartModel;
     QTreeView *treeView;
-    QTableView *tableView;
+    QListView *listView;
 
     // Все для графика
     QChartView *chartView;
-    QChart *chart;
-    QBarCategoryAxis *axisX;
-    QValueAxis *axisY;
+//    QChart *chart;
+//    QBarCategoryAxis *axisX;
+//    QValueAxis *axisY;
 
     // Все для комбобокса
     QComboBox *comboBox;
@@ -85,6 +85,12 @@ private:
 
     // Выбор цвета
     QCheckBox *checkBox;
+
+    // Кнопка
+    QPushButton* openTreeView;
+
+    // Лейбл текст выбор диаграммы
+    QLabel* diagrammType;
 
 };
 

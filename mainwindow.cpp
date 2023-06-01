@@ -7,12 +7,15 @@ int IOCContainer::s_nextTypeId = 0;
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWindow)
 {
 
+    //--------------------------------------------------------------------------------------------
     // Первоначальная настройка главного окна
     ui->setupUi(this);
     this->setGeometry(100, 100, 1500, 500);
     this->setStatusBar(new QStatusBar(this));
     this->statusBar()->showMessage("Выбранный путь : ");    // изменить(?)
 
+    //--------------------------------------------------------------------------------------------
+    // Настройка файловых систем
     // Первоначальная настройка дерева файлов (файловой системы)
     QString homePath = QDir::homePath();
     leftPartModel = new QFileSystemModel(this);
@@ -24,6 +27,17 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
     rightPartModel->setFilter(QDir::NoDotAndDotDot | QDir::Files);
     rightPartModel->setRootPath(homePath);
 
+    QStringList formats;
+    formats << "sqlite" << "json" << "csv";
+    QStringList filters;
+    for (const QString& format : formats) {
+        filters.append(QString("*.%1").arg(format));
+    }
+
+    rightPartModel->setNameFilters(filters);
+    rightPartModel->setNameFilterDisables(false);
+
+
     // Настриваем дерево файлов на основе leftPartModel
     treeView = new QTreeView();
     treeView->setModel(leftPartModel);
@@ -31,32 +45,26 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
     treeView->header()->resizeSection(0, 200);
 
     // Настриваем таблицу файлов на основе rightPartModel
-    tableView = new QTableView();
-    tableView->setModel(rightPartModel);
-
-    // Создаем объект "сплиттер(разделитель)", будет разделять дерево и таблицу
-    QSplitter *splitter = new QSplitter(parent);
+    listView = new QListView();
+    listView->setModel(rightPartModel);
 
 
     //--------------------------------------------------------------------------------------------
-
     // Первоначальная настройка графика
-    // Создание виджета управления для графика
     chartView = new QChartView();
     chartView->setRenderHint(QPainter::Antialiasing);
     chartView->setMinimumSize(600, 400);
-    chart = chartView->chart();
+
 
     // Установка осей
-    axisX = new QBarCategoryAxis();
-    chart->addAxis(axisX, Qt::AlignBottom);
-
-    axisY = new QValueAxis();
-    chart->addAxis(axisY, Qt::AlignLeft);
+//    axisX = new QBarCategoryAxis();
+//    chart->addAxis(axisX, Qt::AlignBottom);
+//    axisY = new QValueAxis();
+//    chart->addAxis(axisY, Qt::AlignLeft);
 
     //--------------------------------------------------------------------------------------------
 
-    // Добавим выбор графиков - comboBox
+    // Настройка выбора графиков
     comboBox = new QComboBox();
     comboBox->addItem("Столбчатая диаграмма");
     comboBox->addItem("Круговая диаграмма");
@@ -66,25 +74,39 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
     // Добавим выбор цвета - checkBox
     checkBox = new QCheckBox("Черно-белый");
 
+    //---------------------------------------------------------------------------------------------------
+
+    // Настройка кнопки для открытия дерева выбора папки
+    openTreeView = new QPushButton("Открыть");
 
     //---------------------------------------------------------------------------------------------------
+
+    // Настройка строки "Выберите тип диаграммы"
+    diagrammType = new QLabel("Выберите тип диаграммы");
+
+    //---------------------------------------------------------------------------------------------------
+    // Компоновка окна
     // Создание главного макета
-    QHBoxLayout *mainLayout = new QHBoxLayout();
-    QVBoxLayout *VerticalBox = new QVBoxLayout();
+    // Часть окна с функциями и часть окна с выводом
+    QHBoxLayout *functionLayout = new QHBoxLayout();
+    QSplitter *splitter = new QSplitter(parent);
+
+    // Добавление виджетов на часть с функциями
+    functionLayout->addWidget(openTreeView);
+    functionLayout->addWidget(diagrammType);
+    functionLayout->addWidget(comboBox);
+    functionLayout->addWidget(checkBox);
 
     // Добавление виджетов на QSplitter
-    splitter->addWidget(treeView);
-    splitter->addWidget(tableView);
+    splitter->addWidget(listView);
+    splitter->addWidget(chartView);
 
-    // Добавление в левую часть кнопок и графика
-    VerticalBox->addWidget(chartView);
-    VerticalBox->addWidget(comboBox);
-    VerticalBox->addWidget(checkBox);
+    // Основное окно
+    QVBoxLayout *mainLayout = new QVBoxLayout();
 
     // Добавление QSplitter и виджета с графиком на главный макет
+    mainLayout->addLayout(functionLayout);
     mainLayout->addWidget(splitter);
-    mainLayout->addLayout(VerticalBox);
-
 
     // Создание виджета для главного макета
     QWidget *mainWidget = new QWidget();
@@ -101,14 +123,19 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
     connect(treeSelectionModel, &QItemSelectionModel::selectionChanged, this, &MainWindow::on_selectionTreeChangedSlot);
 
     // Отслеживание выбранного файла в таблице файлов
-    QItemSelectionModel *tableSelectionModel = tableView->selectionModel();
-    connect(tableSelectionModel, &QItemSelectionModel::selectionChanged, this, &MainWindow::on_selectionTableChangedSlot);
+
+    QItemSelectionModel *listSelectionModel = listView->selectionModel();
+    connect(listSelectionModel, &QItemSelectionModel::selectionChanged, this, &MainWindow::on_selectionListChangedSlot);
 
     // Подключение сигнала activated к слоту comboBoxItemSelected
     connect(comboBox, SIGNAL(activated(int)), this, SLOT(comboBoxItemSelected(int)));
 
     // Соединяем сигнал "stateChanged" CheckBox со слотом для изменения цветов графика
     connect(checkBox, &QCheckBox::stateChanged, this, &MainWindow::onCheckBoxStateChanged);
+
+    // Соединим сигнал от кнопки
+    connect(openTreeView, &QPushButton::clicked, this, &MainWindow::onOpenTreeView);
+
 
     //Пример организации установки курсора в TreeView относительно модельного индекса
     QItemSelection toggleSelection;
@@ -142,43 +169,54 @@ void MainWindow::on_selectionTreeChangedSlot(const QItemSelection &selected, con
     // Получив выбранные данные из левой части filePath(путь к папке/файлу).
     // Для представления в правой части устанваливаем корневой индекс относительно filePath.
     // Табличное представление отображает только файлы, находящиеся в filePath (папки не отображает)
-    tableView->setRootIndex(rightPartModel->setRootPath(filePath));
+
+    listView->setRootIndex(rightPartModel->setRootPath(filePath))
 }
 
 
 /*
  * Слот для обработки выбора элемента в TableView.
  * Выбор осуществляется с помощью курсора.
+<<<<<<< Updated upstream
+=======
+ * Добавить проверку новых данных перед рисованием
+>>>>>>> Stashed changes
  */
-void MainWindow::on_selectionTableChangedSlot(const QItemSelection &selected, const QItemSelection &deselected)
+void MainWindow::on_selectionListChangedSlot(const QItemSelection &selected, const QItemSelection &deselected)
 {
     Q_UNUSED(deselected);
 
-    QModelIndex index = tableView->selectionModel()->currentIndex();
+    QModelIndex index = listView->selectionModel()->currentIndex();
     filePath = rightPartModel->filePath(index);
     this->statusBar()->showMessage("Выбранный файл : " + filePath);
 
-    IOCContainer DataGetterContainer;
     DataGetterContainer.RegisterInstance<IDataGetter, SQLiteDataGetter>();
+
     if(DataGetterContainer.GetObject<IDataGetter>()->CheckFile(filePath))
     {
         fileData = DataGetterContainer.GetObject<IDataGetter>()->getData(filePath);
-    }
+        if(!fileData.isEmpty())
+        {
+            QString selectedText = comboBox->currentText();
+            if (selectedText == "Столбчатая диаграмма")
+            {
+                DataGetterContainer.RegisterInstance<ChartStrategy, BarChartStrategy>();
+                setChartStrategy(DataGetterContainer.GetObject<ChartStrategy>());
+                chartStrategy->draw(chartView, fileData);
+            }
 
-    if(!fileData.isEmpty())
-    {
-    QString selectedText = comboBox->currentText();
-    if (selectedText == "Столбчатая диаграмма")
-    {
-        DrawBar();
+            if (selectedText == "Круговая диаграмма")
+            {
+                DataGetterContainer.RegisterInstance<ChartStrategy, PieChartStrategy>();
+                setChartStrategy(DataGetterContainer.GetObject<ChartStrategy>());
+                chartStrategy->draw(chartView, fileData);
+            }
+        }
+        else
+        {
+        //вывод отсутствия данных на экран
+        }
     }
-
-    if (selectedText == "Круговая диаграмма")
-    {
-        DrawPie();
-    }
-    }
-
 }
 
 void MainWindow::onCheckBoxStateChanged(int state)
@@ -187,15 +225,15 @@ void MainWindow::onCheckBoxStateChanged(int state)
     {
     QGraphicsColorizeEffect* effect = new QGraphicsColorizeEffect;
     effect->setColor(Qt::black);
-    chart->setGraphicsEffect(effect);
+    chartView->chart->setGraphicsEffect(effect);
     }
     else
     {
-
-    chart->setGraphicsEffect(nullptr);
+    chartView->setGraphicsEffect(nullptr);
     }
 }
 
+// Переписать выбор комбобокса
 void MainWindow::comboBoxItemSelected(int index)
 {
 
@@ -213,65 +251,36 @@ void MainWindow::comboBoxItemSelected(int index)
     }
 }
 
-void MainWindow::DrawBar()
+
+void MainWindow::onOpenTreeView()
 {
-    chart->removeAllSeries();
-    // Получение минимального и максимального значения из выборки
-    qreal minValue = std::numeric_limits<qreal>::max();
-    qreal maxValue = std::numeric_limits<qreal>::lowest();
-
-    // Получение минимального и максимального значения из выборки
-    QBarSeries *series = new QBarSeries();
-    for (const QPair<QString, qreal>& pair : fileData) {
-        QString month = pair.first;
-        qreal average = pair.second;
-        QBarSet *barSet = new QBarSet(month);
-        *barSet << average;
-        series->append(barSet);
-
-        minValue = std::min(minValue, average);
-        maxValue = std::max(maxValue, average);
-    }
-
-    // --------------------------------------------------------------------------------
-
-    // Создание диаграммы
-    chart->addSeries(series);
-    chart->setTitle("Среднее значение по месяцам");
-    chart->setAnimationOptions(QChart::SeriesAnimations);
-
-    axisY->setRange(minValue - 5, maxValue + 5 );
-
-    // Установка осей
-    series->attachAxis(axisX);
-    series->attachAxis(axisY);
-
-    // Создание представления диаграммы
-    chartView->setRenderHint(QPainter::Antialiasing);
-
-    // Отображение окна
-    chartView->update();
+    treeView -> show();
 }
 
-void MainWindow::DrawPie()
+void MainWindow::comboBoxItemSelected(int index)
 {
-    chart->removeAllSeries();
+    if(!fileData.isEmpty())
+    {
+            QString selectedText = comboBox->currentText();
+            if (selectedText == "Столбчатая диаграмма")
+            {
+                DataGetterContainer.RegisterInstance<ChartStrategy, BarChartStrategy>();
+                setChartStrategy(DataGetterContainer.GetObject<ChartStrategy>());
+                chartStrategy->draw(chartView, fileData);
+            }
 
-    // Создание серии данных для круговой диаграммы
-    QPieSeries *series = new QPieSeries();
-    for (const QPair<QString, qreal>& pair : fileData) {
-        QString month = pair.first;
-        qreal average = pair.second;
-        series->append(month, average);
+            if (selectedText == "Круговая диаграмма")
+            {
+                DataGetterContainer.RegisterInstance<ChartStrategy, PieChartStrategy>();
+                setChartStrategy(DataGetterContainer.GetObject<ChartStrategy>());
+                chartStrategy->draw(chartView, fileData);
+            }
+    }
+    else
+    {
+            //вывод отсутствия данных на экран
     }
 
-    // Создание диаграммы
-    chart->addSeries(series);
-    chart->setTitle("Среднее значение по месяцам");
-    chart->setAnimationOptions(QChart::SeriesAnimations);
-
-    // Отображение окна
-    chartView->show();
 }
 
 MainWindow::~MainWindow()
