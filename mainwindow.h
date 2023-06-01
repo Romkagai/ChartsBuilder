@@ -6,7 +6,6 @@
 #include <QFileSystemModel>
 #include <QTreeView>
 #include <QTableView>
-#include "ui_mainwindow.h"
 #include <QSplitter>
 #include <QListView>
 #include <QTreeView>
@@ -28,6 +27,9 @@
 #include <QPainter>
 #include <QPdfWriter>
 
+#include "ioc_container.h"
+#include "chartdrawer.h"
+
 
 QT_BEGIN_NAMESPACE
 namespace Ui
@@ -45,8 +47,15 @@ public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
 
-    void DrawBar();
-    void DrawPie();
+    void setChartStrategy(std::shared_ptr<ChartStrategy> strategy)
+    {
+        chartStrategy = strategy;
+    }
+
+    void drawChart()
+    {
+        chartStrategy->draw(chartView, fileData);
+    }
 
 
 
@@ -56,6 +65,7 @@ private slots:
     void on_selectionListChangedSlot(const QItemSelection &selected, const QItemSelection &deselected);
     void comboBoxItemSelected(int index);
     void onCheckBoxStateChanged(int state);
+    void onButtonOpenTreeView();
 
 
 
@@ -86,11 +96,17 @@ private:
     // Выбор цвета
     QCheckBox *checkBox;
 
-    // Кнопка
+    // Кнопка открытия дерева файлов
     QPushButton* openTreeView;
 
-    // Лейбл текст выбор диаграммы
+    // Текст "Выбрать тип диаграммы"
     QLabel* diagrammType;
+
+    //IoC_контейнер
+    IOCContainer DataGetterContainer;
+
+    // Стратегия для рисования графика
+    std::shared_ptr<ChartStrategy> chartStrategy;
 
 };
 

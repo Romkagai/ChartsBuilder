@@ -1,6 +1,7 @@
 #include "mainwindow.h"
 #include "ioc_container.h"
 #include "datagetter.h"
+#include "chartdrawer.h"
 
 int IOCContainer::s_nextTypeId = 0;
 
@@ -134,7 +135,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
     connect(checkBox, &QCheckBox::stateChanged, this, &MainWindow::onCheckBoxStateChanged);
 
     // Соединим сигнал от кнопки
-    connect(openTreeView, &QPushButton::clicked, this, &MainWindow::onOpenTreeView);
+    connect(openTreeView, &QPushButton::clicked, this, &MainWindow::onButtonOpenTreeView);
 
 
     //Пример организации установки курсора в TreeView относительно модельного индекса
@@ -170,17 +171,13 @@ void MainWindow::on_selectionTreeChangedSlot(const QItemSelection &selected, con
     // Для представления в правой части устанваливаем корневой индекс относительно filePath.
     // Табличное представление отображает только файлы, находящиеся в filePath (папки не отображает)
 
-    listView->setRootIndex(rightPartModel->setRootPath(filePath))
+    listView->setRootIndex(rightPartModel->setRootPath(filePath));
 }
 
 
 /*
  * Слот для обработки выбора элемента в TableView.
- * Выбор осуществляется с помощью курсора.
-<<<<<<< Updated upstream
-=======
  * Добавить проверку новых данных перед рисованием
->>>>>>> Stashed changes
  */
 void MainWindow::on_selectionListChangedSlot(const QItemSelection &selected, const QItemSelection &deselected)
 {
@@ -202,14 +199,14 @@ void MainWindow::on_selectionListChangedSlot(const QItemSelection &selected, con
             {
                 DataGetterContainer.RegisterInstance<ChartStrategy, BarChartStrategy>();
                 setChartStrategy(DataGetterContainer.GetObject<ChartStrategy>());
-                chartStrategy->draw(chartView, fileData);
+                drawChart();
             }
 
             if (selectedText == "Круговая диаграмма")
             {
                 DataGetterContainer.RegisterInstance<ChartStrategy, PieChartStrategy>();
                 setChartStrategy(DataGetterContainer.GetObject<ChartStrategy>());
-                chartStrategy->draw(chartView, fileData);
+                drawChart();
             }
         }
         else
@@ -225,34 +222,15 @@ void MainWindow::onCheckBoxStateChanged(int state)
     {
     QGraphicsColorizeEffect* effect = new QGraphicsColorizeEffect;
     effect->setColor(Qt::black);
-    chartView->chart->setGraphicsEffect(effect);
+    chartView->chart()->setGraphicsEffect(effect);
     }
     else
     {
-    chartView->setGraphicsEffect(nullptr);
+    chartView->chart()->setGraphicsEffect(nullptr);
     }
 }
 
-// Переписать выбор комбобокса
-void MainWindow::comboBoxItemSelected(int index)
-{
-
-    if(!fileData.isEmpty()){
-    QString selectedText = comboBox->itemText(index);
-    if (selectedText == "Столбчатая диаграмма")
-    {
-        DrawBar();
-    }
-
-    if (selectedText == "Круговая диаграмма")
-    {
-        DrawPie();
-    }
-    }
-}
-
-
-void MainWindow::onOpenTreeView()
+void MainWindow::onButtonOpenTreeView()
 {
     treeView -> show();
 }
@@ -266,14 +244,14 @@ void MainWindow::comboBoxItemSelected(int index)
             {
                 DataGetterContainer.RegisterInstance<ChartStrategy, BarChartStrategy>();
                 setChartStrategy(DataGetterContainer.GetObject<ChartStrategy>());
-                chartStrategy->draw(chartView, fileData);
+                drawChart();
             }
 
             if (selectedText == "Круговая диаграмма")
             {
                 DataGetterContainer.RegisterInstance<ChartStrategy, PieChartStrategy>();
                 setChartStrategy(DataGetterContainer.GetObject<ChartStrategy>());
-                chartStrategy->draw(chartView, fileData);
+                drawChart();
             }
     }
     else
