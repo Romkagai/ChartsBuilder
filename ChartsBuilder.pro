@@ -18,6 +18,7 @@ SOURCES += \
     mainwindow.cpp
 
 HEADERS += \
+    chartdrawer.h \
     datagetter.h \
     ioc_container.h \
     mainwindow.h
