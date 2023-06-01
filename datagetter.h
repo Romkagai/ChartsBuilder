@@ -55,6 +55,8 @@ class SQLiteDataGetter : public IDataGetter
 
     QList<QPair<QString, qreal>> getData(const QString &filePath)
     {
+        closeDatabase();
+        openDatabase(filePath);
         QList<QPair<QString, qreal>> data;
         QStringList tables = database.tables();
         QString tableName = tables.first();
