@@ -1,9 +1,10 @@
 #ifndef CHARTDRAWER_H
 #define CHARTDRAWER_H
 #include <QString>
+
+// Подключаем библиотеки для работы с графиками
 #include <QChartView>
 #include <QBarSeries>
-// Подключаем библиотеки для работы с графиками
 #include <QtCharts/QChartView>
 #include <QtCharts/QPieSeries>
 #include <QtCharts/QPieSlice>
@@ -11,79 +12,95 @@
 #include <QPainter>
 #include <QPdfWriter>
 
-class ChartStrategy
+// Используем шаблонный метод
+// Какие шаги алгоритма выделить? Печать добавить тут?
+
+class ChartDrawer
 {
 public:
-    virtual void draw(QChartView* chartView, const QList<QPair<QString, qreal>>& data) = 0;
+    // Общий реализуемый алгоритм
+    void DrawChart(QChartView* chartView, const QList<QPair<QString, qreal>>& data)
+    {
+        // Очистка окна рисования
+        chartView->chart()->removeAllSeries();
+
+        // Первый шаг - подготовка полученных данных (здесь закладываем их в chartView)
+        PrepareData(chartView, data);
+
+        // Второй шаг - настройка диаграммы (в зависимости от типа)
+        ConfigureChart(chartView);
+
+        // Обновление окна вывода
+        chartView->update();
+    };
+
+protected:
+    // Данные функции должны быть переопределены наследниками в зависимости от их предпочтений
+    virtual void PrepareData(QChartView* chartView, const QList<QPair<QString, qreal>>& data) = 0;
+    virtual void ConfigureChart(QChartView* chartView) = 0;
 };
 
-class BarChartStrategy : public ChartStrategy
+
+// Класс для создания столбчатых диаграмм
+class BarChartDrawer : public ChartDrawer
 {
-public:
-    void draw(QChartView* chartView, const QList<QPair<QString, qreal>>& data)
+protected:
+    void PrepareData(QChartView* chartView, const QList<QPair<QString, qreal>>& data)
     {
-        chartView->chart()->removeAllSeries();
-        // Получение минимального и максимального значения из выборки
         qreal minValue = std::numeric_limits<qreal>::max();
         qreal maxValue = std::numeric_limits<qreal>::lowest();
 
-        // Получение минимального и максимального значения из выборки
+        // Получение минимального и максимального значения из выборки (пока что не использую, затем добавить отрисовку осей)
+
+
+        // !!!!!пока что отрисовываем 10 первых значений (группировка данных будет рассмотрена позже)!!!!!
+
+
         QBarSeries *series = new QBarSeries();
-        for (const QPair<QString, qreal>& pair : data) {
-            QString month = pair.first;
-            qreal average = pair.second;
-            QBarSet *barSet = new QBarSet(month);
-            *barSet << average;
+        for (int i = 0; i < 10; ++i) {
+            const QPair<QString, qreal>& pair = data[i];
+            QString time = pair.first;
+            qreal value = pair.second;
+            QBarSet *barSet = new QBarSet(time);
+            *barSet << value;
             series->append(barSet);
-
-            minValue = std::min(minValue, average);
-            maxValue = std::max(maxValue, average);
+            minValue = std::min(minValue, value);
+            maxValue = std::max(maxValue, value);
         }
-
-        // --------------------------------------------------------------------------------
-
-        // Создание диаграммы
         chartView->chart()->addSeries(series);
-        chartView->chart()->setTitle("Среднее значение по месяцам");
+    }
+
+    void ConfigureChart(QChartView* chartView)
+    {
+        chartView->chart()->setTitle("Столбчатая диаграмма");
         chartView->chart()->setAnimationOptions(QChart::SeriesAnimations);
-
-        //chartView->chart()->axisY()->setRange(minValue - 5, maxValue + 5 );
-
-        // Установка осей
-//        series->attachAxis(axisX);
-//        series->attachAxis(axisY);
-
-        // Создание представления диаграммы
         chartView->setRenderHint(QPainter::Antialiasing);
-
-        // Отображение окна
-        chartView->update();
     }
 
 };
 
-class PieChartStrategy : public ChartStrategy
+// Класс для создания круговых диаграмм
+
+class PieChartDrawer : public ChartDrawer
 {
-public:
-    void draw(QChartView* chartView, const QList<QPair<QString, qreal>>& data)
+protected:
+    void PrepareData(QChartView* chartView, const QList<QPair<QString, qreal>>& data)
     {
-        chartView->chart()->removeAllSeries();
-
-        // Создание серии данных для круговой диаграммы
         QPieSeries *series = new QPieSeries();
-        for (const QPair<QString, qreal>& pair : data) {
-            QString month = pair.first;
-            qreal average = pair.second;
-            series->append(month, average);
+        for (int i = 0; i < 10; ++i) {
+            const QPair<QString, qreal>& pair = data[i];
+            QString time = pair.first;
+            qreal value = pair.second;
+            series->append(time, value);
         }
-
-        // Создание диаграммы
         chartView->chart()->addSeries(series);
-        chartView->chart()->setTitle("Среднее значение по месяцам");
-        chartView->chart()->setAnimationOptions(QChart::SeriesAnimations);
+    }
 
-        // Отображение окна
-        chartView->show();
+    void ConfigureChart(QChartView* chartView)
+    {
+        chartView->chart()->setTitle("Круговая диаграмма");
+        chartView->chart()->setAnimationOptions(QChart::SeriesAnimations);
+        chartView->setRenderHint(QPainter::Antialiasing);
     }
 
 };
