@@ -28,8 +28,7 @@
 #include <QPdfWriter>
 
 #include "ioc_container.h"
-#include "chartdrawer.h"
-
+#include "datagetter.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui
@@ -47,14 +46,19 @@ public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
 
-    void setChartStrategy(std::shared_ptr<ChartStrategy> strategy)
+    void setDataGetterStrategy(std::shared_ptr<IDataGetterStrategy> strategy)
     {
-        chartStrategy = strategy;
+        DataGetterStrategy = strategy;
     }
 
-    void drawChart()
+    bool CheckFile()
     {
-        chartStrategy->draw(chartView, fileData);
+        return DataGetterStrategy->CheckFile(filePath);
+    }
+
+    QList<QPair<QString, qreal>> GetData()
+    {
+        return DataGetterStrategy->GetData(filePath);
     }
 
 
@@ -63,7 +67,7 @@ public:
 private slots:
     void on_selectionTreeChangedSlot(const QItemSelection &selected, const QItemSelection &deselected);
     void on_selectionListChangedSlot(const QItemSelection &selected, const QItemSelection &deselected);
-    void comboBoxItemSelected(int index);
+    void comboBoxItemSelected();
     void onCheckBoxStateChanged(int state);
     void onButtonOpenTreeView();
 
@@ -78,13 +82,10 @@ private:
     QTreeView *treeView;
     QListView *listView;
 
-    // Все для графика
+    // Окно вывода графика
     QChartView *chartView;
-//    QChart *chart;
-//    QBarCategoryAxis *axisX;
-//    QValueAxis *axisY;
 
-    // Все для комбобокса
+    // Выбор типа графика
     QComboBox *comboBox;
 
     // Путь до файла
@@ -93,7 +94,7 @@ private:
     // Данные
     QList<QPair<QString, qreal>> fileData;
 
-    // Выбор цвета
+    // Чек-бокс выбора цвета графика
     QCheckBox *checkBox;
 
     // Кнопка открытия дерева файлов
@@ -103,10 +104,10 @@ private:
     QLabel* diagrammType;
 
     //IoC_контейнер
-    IOCContainer DataGetterContainer;
+    IOCContainer Container;
 
-    // Стратегия для рисования графика
-    std::shared_ptr<ChartStrategy> chartStrategy;
+    //Стратегия для взятия данных
+    std::shared_ptr<IDataGetterStrategy> DataGetterStrategy;
 
 };
 

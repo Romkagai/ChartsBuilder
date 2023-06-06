@@ -2,20 +2,23 @@
 #include "ioc_container.h"
 #include "datagetter.h"
 #include "chartdrawer.h"
+#include "ui_mainwindow.h"
 
 int IOCContainer::s_nextTypeId = 0;
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWindow)
 {
 
-    //--------------------------------------------------------------------------------------------
+    //---------------------------------------------------------------------------------------------------
+
     // Первоначальная настройка главного окна
     ui->setupUi(this);
     this->setGeometry(100, 100, 1500, 500);
     this->setStatusBar(new QStatusBar(this));
     this->statusBar()->showMessage("Выбранный путь : ");    // изменить(?)
 
-    //--------------------------------------------------------------------------------------------
+    //---------------------------------------------------------------------------------------------------
+
     // Настройка файловых систем
     // Первоначальная настройка дерева файлов (файловой системы)
     QString homePath = QDir::homePath();
@@ -28,6 +31,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
     rightPartModel->setFilter(QDir::NoDotAndDotDot | QDir::Files);
     rightPartModel->setRootPath(homePath);
 
+    // Применяем фильтрацию типов данных для листа файлов по условию задачи
+    // Вместо переписывания MVC под себя
     QStringList formats;
     formats << "sqlite" << "json" << "csv";
     QStringList filters;
@@ -40,7 +45,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
 
 
     // Настриваем дерево файлов на основе leftPartModel
-    treeView = new QTreeView();
+    treeView = new QTreeView(this);
     treeView->setModel(leftPartModel);
     treeView->expandAll();
     treeView->header()->resizeSection(0, 200);
@@ -50,20 +55,14 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
     listView->setModel(rightPartModel);
 
 
-    //--------------------------------------------------------------------------------------------
-    // Первоначальная настройка графика
+    //---------------------------------------------------------------------------------------------------
+
+    // Первоначальная настройка окна графика
     chartView = new QChartView();
     chartView->setRenderHint(QPainter::Antialiasing);
     chartView->setMinimumSize(600, 400);
 
-
-    // Установка осей
-//    axisX = new QBarCategoryAxis();
-//    chart->addAxis(axisX, Qt::AlignBottom);
-//    axisY = new QValueAxis();
-//    chart->addAxis(axisY, Qt::AlignLeft);
-
-    //--------------------------------------------------------------------------------------------
+    //---------------------------------------------------------------------------------------------------
 
     // Настройка выбора графиков
     comboBox = new QComboBox();
@@ -116,25 +115,24 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
     // Установка виджета на главное окно
     setCentralWidget(mainWidget);
 
-    //---------------------------------------------------------------------------------------
+    //---------------------------------------------------------------------------------------------------
 
-    // Сигналы
+    // Установка сигнально-слотовых соединений
     // Отслеживание выбранного файла в дереве
     QItemSelectionModel *treeSelectionModel = treeView->selectionModel();
     connect(treeSelectionModel, &QItemSelectionModel::selectionChanged, this, &MainWindow::on_selectionTreeChangedSlot);
 
     // Отслеживание выбранного файла в таблице файлов
-
     QItemSelectionModel *listSelectionModel = listView->selectionModel();
     connect(listSelectionModel, &QItemSelectionModel::selectionChanged, this, &MainWindow::on_selectionListChangedSlot);
 
-    // Подключение сигнала activated к слоту comboBoxItemSelected
-    connect(comboBox, SIGNAL(activated(int)), this, SLOT(comboBoxItemSelected(int)));
+    // Подключение сигнала activated к слоту comboBoxItemSelected (выбор другого типа графика)
+    connect(comboBox, &QComboBox::activated, this, &MainWindow::comboBoxItemSelected);
 
-    // Соединяем сигнал "stateChanged" CheckBox со слотом для изменения цветов графика
+    // Соединяем сигнал "stateChanged" CheckBox со слотом для изменения цветов графика (переход от цветного к черно-белому)
     connect(checkBox, &QCheckBox::stateChanged, this, &MainWindow::onCheckBoxStateChanged);
 
-    // Соединим сигнал от кнопки
+    // Соединим сигнал от кнопки "clicked" с открытием окна дерева файлов
     connect(openTreeView, &QPushButton::clicked, this, &MainWindow::onButtonOpenTreeView);
 
 
@@ -146,11 +144,9 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
     treeSelectionModel->select(toggleSelection, QItemSelectionModel::Toggle);
 }
 
-/*
- * Слот для обработки выбора элемента в TreeView.
- * Выбор осуществляется с помощью курсора.
- */
+//---------------------------------------------------------------------------------------------------
 
+//Слот для обработки выбора элемента в TreeView. Выбор осуществляется с помощью курсора.
 void MainWindow::on_selectionTreeChangedSlot(const QItemSelection &selected, const QItemSelection &deselected)
 {
     Q_UNUSED(deselected);
@@ -170,43 +166,67 @@ void MainWindow::on_selectionTreeChangedSlot(const QItemSelection &selected, con
     // Получив выбранные данные из левой части filePath(путь к папке/файлу).
     // Для представления в правой части устанваливаем корневой индекс относительно filePath.
     // Табличное представление отображает только файлы, находящиеся в filePath (папки не отображает)
-
     listView->setRootIndex(rightPartModel->setRootPath(filePath));
 }
 
+//---------------------------------------------------------------------------------------------------
 
-/*
- * Слот для обработки выбора элемента в TableView.
- * Добавить проверку новых данных перед рисованием
- */
+// Слот для обработки выбора элемента в TableView. Добавить проверку новых данных перед рисованием (!)
+// Предлагается сразу переходить к отрисовке графика при нажатии на файл
 void MainWindow::on_selectionListChangedSlot(const QItemSelection &selected, const QItemSelection &deselected)
 {
     Q_UNUSED(deselected);
+    Q_UNUSED(selected);
 
     QModelIndex index = listView->selectionModel()->currentIndex();
     filePath = rightPartModel->filePath(index);
     this->statusBar()->showMessage("Выбранный файл : " + filePath);
 
-    DataGetterContainer.RegisterInstance<IDataGetter, SQLiteDataGetter>();
 
-    if(DataGetterContainer.GetObject<IDataGetter>()->CheckFile(filePath))
+    QFileInfo fileInfo(filePath);
+    QString extension = fileInfo.suffix();
+
+    qDebug() << "Расширение файла:" << extension;
+
+
+    // Пока что установка стратегии реализована так
+    if (extension == "json")
     {
-        fileData = DataGetterContainer.GetObject<IDataGetter>()->getData(filePath);
+        Container.RegisterInstance<IDataGetterStrategy, JSONDataGetterStrategy>();
+        setDataGetterStrategy(Container.GetObject<IDataGetterStrategy>());
+    }
+    else if (extension == "sqlite")
+    {
+        Container.RegisterInstance<IDataGetterStrategy, SQLiteDataGetterStrategy>();
+        setDataGetterStrategy(Container.GetObject<IDataGetterStrategy>());
+    }
+
+    if(CheckFile())
+    {
+        // отладочная информация
+        qDebug() << "Проверка файла пройдена успешно.";
+        fileData = GetData();
+
+        for (int i = 0; i < qMin(10, fileData.size()); ++i)
+        {
+            const QPair<QString, qreal>& value = fileData[i];
+            qDebug() << "Time:" << value.first << "Value:" << value.second;
+        }
+
+        // Пока что выбор графика для рисования реализован так
         if(!fileData.isEmpty())
         {
             QString selectedText = comboBox->currentText();
             if (selectedText == "Столбчатая диаграмма")
             {
-                DataGetterContainer.RegisterInstance<ChartStrategy, BarChartStrategy>();
-                setChartStrategy(DataGetterContainer.GetObject<ChartStrategy>());
-                drawChart();
+                Container.RegisterInstance<ChartDrawer, BarChartDrawer>();
+                Container.GetObject<ChartDrawer>()->DrawChart(chartView, fileData);
             }
 
             if (selectedText == "Круговая диаграмма")
             {
-                DataGetterContainer.RegisterInstance<ChartStrategy, PieChartStrategy>();
-                setChartStrategy(DataGetterContainer.GetObject<ChartStrategy>());
-                drawChart();
+                Container.RegisterInstance<ChartDrawer, PieChartDrawer>();
+                Container.GetObject<ChartDrawer>()->DrawChart(chartView, fileData);
             }
         }
         else
@@ -216,43 +236,63 @@ void MainWindow::on_selectionListChangedSlot(const QItemSelection &selected, con
     }
 }
 
+//---------------------------------------------------------------------------------------------------
+
+// Слот для обработки нажатия Чек-бокса: изменяем эффект на графике
 void MainWindow::onCheckBoxStateChanged(int state)
 {
+    // Если выбран, то применяем эффект
     if (state == Qt::Checked)
     {
-    QGraphicsColorizeEffect* effect = new QGraphicsColorizeEffect;
-    effect->setColor(Qt::black);
-    chartView->chart()->setGraphicsEffect(effect);
+        QGraphicsColorizeEffect* effect = new QGraphicsColorizeEffect;
+        effect->setColor(Qt::black);
+        chartView->chart()->setGraphicsEffect(effect);
     }
     else
     {
-    chartView->chart()->setGraphicsEffect(nullptr);
+        // Иначе эффект сбрасываем
+        chartView->chart()->setGraphicsEffect(nullptr);
     }
 }
 
+//---------------------------------------------------------------------------------------------------
+
+// Слот для обработки нажатия кнопки "Открыть" : кнопка открытия дерева
+// !!! необходимо убить окно при закрытии главного !!!
 void MainWindow::onButtonOpenTreeView()
 {
-    treeView -> show();
+    treeView->resize(600, 600); // Подредактируем размер
+    if (treeView->isVisible())  // Если окно уже отображается (открыто)
+    {
+        treeView->raise();      // Выведем его поверх
+    }
+    else
+    {
+        treeView->show();       // Иначе отобразим его
+    }
 }
 
-void MainWindow::comboBoxItemSelected(int index)
+//---------------------------------------------------------------------------------------------------
+
+// Слот для обработки выбора из ComboBox - при выборе предлагается сразу отрисовывать график согласно выбранному варианту
+// подумать над реализацией - будем ли отрисовывать график?
+void MainWindow::comboBoxItemSelected()
 {
+    qDebug() << "Шаблон рисования изменен";
     if(!fileData.isEmpty())
     {
-            QString selectedText = comboBox->currentText();
-            if (selectedText == "Столбчатая диаграмма")
-            {
-                DataGetterContainer.RegisterInstance<ChartStrategy, BarChartStrategy>();
-                setChartStrategy(DataGetterContainer.GetObject<ChartStrategy>());
-                drawChart();
-            }
+        QString selectedText = comboBox->currentText();
+        if (selectedText == "Столбчатая диаграмма")
+        {
+            Container.RegisterInstance<ChartDrawer, BarChartDrawer>();
+            Container.GetObject<ChartDrawer>()->DrawChart(chartView, fileData);
+        }
 
-            if (selectedText == "Круговая диаграмма")
-            {
-                DataGetterContainer.RegisterInstance<ChartStrategy, PieChartStrategy>();
-                setChartStrategy(DataGetterContainer.GetObject<ChartStrategy>());
-                drawChart();
-            }
+        if (selectedText == "Круговая диаграмма")
+        {
+            Container.RegisterInstance<ChartDrawer, PieChartDrawer>();
+            Container.GetObject<ChartDrawer>()->DrawChart(chartView, fileData);
+        }
     }
     else
     {
