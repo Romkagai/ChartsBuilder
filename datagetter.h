@@ -24,13 +24,16 @@
 
 // Подключаем библиотеки для работы с JSON
 
-
+// Стратегия получения данных
+// Включает в себя две функции: проверка файла, получение данных.
 
 class IDataGetterStrategy
 {
 public:
     virtual ~IDataGetterStrategy() = default;
+    // Проверка файла
     virtual bool CheckFile(const QString &filePath) = 0;
+    // Получение данных (храним данные в листе содержащем пары формата "строка-значение")
     virtual QList<QPair<QString, qreal>> GetData(const QString &filePath) = 0;
 
 };
@@ -39,64 +42,61 @@ class SQLiteDataGetterStrategy : public IDataGetterStrategy
 {
     bool CheckFile(const QString &filePath)
     {
-        openDatabase(filePath);
+        QSqlDatabase database = QSqlDatabase::addDatabase("QSQLITE");
+        database.setDatabaseName(filePath);
+
+        // Проверка открытия базы данных
+        if (!database.open())
+        {
+            return false;
+        }
+
+        // Проверка содержания таблиц в базе данных
         QStringList tables = database.tables();
         if (tables.isEmpty()) {
             qDebug() << "В базе данных отсутствуют таблицы";
-            closeDatabase();
+            database.close();
             return false;
         }
-        closeDatabase();
+
+        // Проверка входных данных - условимся тем, что в таблице должны быть два
+        // столбца данных
+        QString table = tables.first();
+        QSqlRecord record = database.record(table);
+        if (record.count() != 2) {
+            database.close();
+            return false;
+        }
+
+        database.close();
         return true;
     }
 
-    // Пока что за процесс компоновки данных отвечает функция получения данных
-    // Так мы обрабатываем данные при их получении и занимаем меньше пространства в памяти при хранении этих данных
-    // Но стоит ли компоновку данных выносить в отдельную функцию?
     QList<QPair<QString, qreal>> GetData(const QString &filePath)
     {
-        closeDatabase();
-        openDatabase(filePath);
+        QSqlDatabase database = QSqlDatabase::addDatabase("QSQLITE");
+        database.setDatabaseName(filePath);
+        database.open();
+
         QList<QPair<QString, qreal>> data;
+        // Получаем все таблицы из базы данных
         QStringList tables = database.tables();
-        QString tableName = tables.first();
+        // Берем первую таблицу
+        QString table = tables.first();
+        // Создаем объект - запрос
         QSqlQuery query;
-        // пока что будем считать, что запрос выполняется в любом случае
-        query.exec("SELECT * FROM " + tableName + " "); // предусмотреть sql инъекцию?
+        // Достаем все значения
+        query.exec("SELECT * FROM " + table + " ");
+        // Пока еще есть значения, достаем очередные и помещаем в data.
         while (query.next()) {
             QString Time = query.value(0).toString();
             qreal Value = query.value(1).toReal();
             data.append(qMakePair(Time, Value));
         }
-        closeDatabase();
+        database.close();
         return data;
     }
-
-private:
-    QSqlDatabase database;
-
-    void openDatabase(const QString& filePath)
-    {
-        closeDatabase();
-        database = QSqlDatabase::addDatabase("QSQLITE");
-        database.setDatabaseName(filePath);
-
-        if (!database.open())
-        {
-                qDebug() << "Ошибка открытия базы данных:" << database.lastError().text();
-        }
-    }
-
-    void closeDatabase()
-    {
-        if (database.isOpen())
-        {
-                database.close();
-        }
-    }
-
 };
-
 
 
 class JSONDataGetterStrategy : public IDataGetterStrategy
@@ -104,30 +104,90 @@ class JSONDataGetterStrategy : public IDataGetterStrategy
 public:
     bool CheckFile(const QString& filePath)
     {
+        // Проверка открытия файла
         QFile file(filePath);
         if (!file.open(QIODevice::ReadOnly))
         {
-                qDebug() << "Не удалось открыть файл:" << filePath;
-                return false;
+            return false;
         }
 
+        // Считали данные
         QByteArray jsonData = file.readAll();
         file.close();
 
+        // Преобразовали данные в документ json
+        // Если документ не Null и содержит массив и этот массив не пуст, то все хорошо
         QJsonDocument jsonDoc = QJsonDocument::fromJson(jsonData);
-        if (jsonDoc.isNull() || !jsonDoc.isArray())
+        if (jsonDoc.isNull() || !jsonDoc.isArray() || jsonDoc.array().isEmpty())
         {
-                qDebug() << "Данный файл JSON некорректен";
-                return false;
+            return false;
         }
+        return true;
+    }
 
+    QList<QPair<QString, qreal>> GetData(const QString& filePath)
+    {
+        // Создали файл
+        QFile file(filePath);
+        // Открыли на чтение
+        file.open(QIODevice::ReadOnly);
+        // Считали данные
+        QByteArray jsonData = file.readAll();
+        // Закрыли файл
+        file.close();
+        // Поместили данные в документ
+        QJsonDocument jsonDoc = QJsonDocument::fromJson(jsonData);
+        // С документа достали массив данных
         QJsonArray jsonArray = jsonDoc.array();
-        if (jsonArray.isEmpty())
+        // Возвращаемые данные
+        QList<QPair<QString, qreal>> data;
+        // Заполняем данные из массива
+        for (const QJsonValue& value : jsonArray)
         {
-                qDebug() << "Данный JSON файл пуст!";
-                return false;
+            if (value.isObject())
+            {
+                QJsonObject obj = value.toObject();
+                QString Time = obj["Time"].toString();
+                qreal Value = obj["Value"].toDouble();
+                data.append(QPair<QString, qreal>(Time, Value));
+            }
+        }
+        return data;
+    }
+};
+
+class CSVDataGetterStrategy : public IDataGetterStrategy
+{
+public:
+    bool CheckFile(const QString& filePath)
+    {
+        // Проверка файла на открываемость
+        QFile file(filePath);
+        if (!file.open(QIODevice::ReadOnly))
+        {
+            return false;
         }
 
+        // Проверка на наличие данных в файле
+        QByteArray fileData = file.readAll();
+        if (fileData.isEmpty())
+        {
+            file.close();
+            return false;
+        }
+
+        // Проверка корректности формата CSV
+        QTextStream stream(&fileData);
+        QString line = stream.readLine();
+        QStringList fields = line.split(",");
+        if (fields.size() < 2)
+        {
+            qDebug() << "Данный файл CSV некорректен";
+            file.close();
+            return false;
+        }
+
+        file.close();
         return true;
     }
 
@@ -135,31 +195,29 @@ public:
     {
         QFile file(filePath);
         file.open(QIODevice::ReadOnly);
-        QByteArray jsonData = file.readAll();
+        QByteArray fileData = file.readAll();
         file.close();
-        QJsonDocument jsonDoc = QJsonDocument::fromJson(jsonData);
-        QJsonArray jsonArray = jsonDoc.array();
+
         QList<QPair<QString, qreal>> data;
-        for (const QJsonValue& value : jsonArray)
+
+        QTextStream stream(&fileData);
+        stream.readLine(); // Пропускаем заголовок
+
+        while (!stream.atEnd())
         {
-                if (value.isObject())
-                {
-                    QJsonObject obj = value.toObject();
-                    QString Time = obj["Time"].toString();
-                    qreal Value = obj["Value"].toDouble();
-                    data.append(QPair<QString, qreal>(Time, Value));
-                }
+            QString line = stream.readLine();
+            QStringList fields = line.split(",");
+            if (fields.size() >= 2)
+            {
+                QString time = fields[0];
+                qreal value = fields[1].toDouble();
+                data.append(QPair<QString, qreal>(time, value));
+            }
         }
+
         return data;
     }
 };
 
-//class IDataGetter
-//{
-//public:
-//    virtual ~IDataGetter() = 0;
-//    virtual QList<QPair<QString, qreal>> getData() const = 0;
-
-//};
 
 #endif // DATAGETTER_H
