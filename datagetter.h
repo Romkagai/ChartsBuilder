@@ -38,8 +38,8 @@ class SQLiteDataGetterStrategy : public IDataGetterStrategy
 
         // Проверка содержания таблиц в базе данных
         QStringList tables = database.tables();
-        if (tables.isEmpty()) {
-            qDebug() << "В базе данных отсутствуют таблицы";
+        if (tables.isEmpty())
+        {
             database.close();
             return false;
         }
@@ -48,7 +48,8 @@ class SQLiteDataGetterStrategy : public IDataGetterStrategy
         // столбца данных
         QString table = tables.first();
         QSqlRecord record = database.record(table);
-        if (record.count() != 2) {
+        if (record.count() != 2)
+        {
             database.close();
             return false;
         }
@@ -107,6 +108,23 @@ public:
         {
             return false;
         }
+
+        // Проверка наличия ключей "Time" и "Value" в каждом объекте массива
+        QJsonArray jsonArray = jsonDoc.array();
+        for (const QJsonValue& jsonValue : jsonArray)
+        {
+            if (!jsonValue.isObject())
+            {
+                return false;
+            }
+
+            QJsonObject jsonObject = jsonValue.toObject();
+            if (!jsonObject.contains("Time") || !jsonObject.contains("Value"))
+            {
+                return false;
+            }
+        }
+
         return true;
     }
 
@@ -165,9 +183,8 @@ public:
         QTextStream stream(&fileData);
         QString line = stream.readLine();
         QStringList fields = line.split(",");
-        if (fields.size() < 2)
+        if (fields.size() < 2 or !(fields.contains("Time") && fields.contains("Value")))
         {
-            qDebug() << "Данный файл CSV некорректен";
             file.close();
             return false;
         }
