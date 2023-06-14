@@ -93,14 +93,14 @@ class PieChartDrawer : public ChartDrawer
 protected:
     void PrepareData(QChartView* chartView, const QList<QPair<QString, qreal>>& data)
     {
-        QPieSeries *series = new QPieSeries();
+        std::unique_ptr<QPieSeries> series = std::make_unique<QPieSeries>();
         for (int i = 0; i < 10; ++i) {
             const QPair<QString, qreal>& pair = data[i];
             QString time = pair.first;
             qreal value = pair.second;
             series->append(time, value);
         }
-        chartView->chart()->addSeries(series);
+        chartView->chart()->addSeries(series.release());
     }
 
     void ConfigureChart(QChartView* chartView)
