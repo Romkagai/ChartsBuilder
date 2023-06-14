@@ -76,6 +76,7 @@
   
   
 ### UML-диаграмма проекта
+![ChartsBuilderUML](https://github.com/Romkagai/ChartsBuilder/assets/106104315/18bb74ed-8e10-4204-8ba1-f9ad6506d3a4)
 
 
     
