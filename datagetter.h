@@ -3,26 +3,10 @@
 #include <QString>
 #include <QList>
 
-#include <QMainWindow>
-#include <QWidget>
-#include <QFileSystemModel>
-#include <QTreeView>
-#include <QTableView>
-
-#include <QSplitter>
-#include <QListView>
-#include <QTreeView>
-#include <QFileSystemModel>
-#include <QItemSelectionModel>
-#include <QTableView>
-#include <QHeaderView>
-#include <QStatusBar>
 
 // Подключаем библиотеки для работы с SQLITE
 #include <QtSql>
 #include <QSqlQueryModel>
-
-// Подключаем библиотеки для работы с JSON
 
 // Стратегия получения данных
 // Включает в себя две функции: проверка файла, получение данных.
@@ -30,6 +14,7 @@
 class IDataGetterStrategy
 {
 public:
+    // Поставим деструктор дефолтным, компилятор сам определит как уничтожать объект
     virtual ~IDataGetterStrategy() = default;
     // Проверка файла
     virtual bool CheckFile(const QString &filePath) = 0;
@@ -176,7 +161,7 @@ public:
             return false;
         }
 
-        // Проверка корректности формата CSV
+        // Проверка корректности формата CSV (предполагается два столбца)
         QTextStream stream(&fileData);
         QString line = stream.readLine();
         QStringList fields = line.split(",");
@@ -214,7 +199,6 @@ public:
                 data.append(QPair<QString, qreal>(time, value));
             }
         }
-
         return data;
     }
 };
