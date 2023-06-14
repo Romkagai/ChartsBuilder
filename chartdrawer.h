@@ -27,9 +27,6 @@ public:
         chartView->update();
     };
 
-
-
-
 protected:
     // Данные функции должны быть переопределены наследниками в зависимости от их предпочтений
     virtual void PrepareData(QChartView* chartView, const QList<QPair<QString, qreal>>& data) = 0;
@@ -70,7 +67,7 @@ protected:
         std::unique_ptr<QBarSeries> series = std::make_unique<QBarSeries>();
 
         for (const QString& yearMonth : groupedData.keys()) {
-            // Вычисляем среднее значение для каждой группы
+            // Вычисляем среднее значение для каждого года-месяца
             qreal averageValue = groupedData[yearMonth] / groupCount[yearMonth];
             std::unique_ptr<QBarSet> barSet = std::make_unique<QBarSet>(yearMonth);
             *barSet << averageValue;
