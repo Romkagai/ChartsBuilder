@@ -5,16 +5,9 @@
 // Подключаем библиотеки для работы с графиками
 #include <QChartView>
 #include <QBarSeries>
-#include <QtCharts/QChartView>
-#include <QtCharts/QPieSeries>
-#include <QtCharts/QPieSlice>
 #include <QtCharts>
-#include <QPainter>
-#include <QPdfWriter>
 
 // Используем шаблонный метод
-// Какие шаги алгоритма выделить? Печать добавить тут?
-
 class ChartDrawer
 {
 public:
@@ -34,6 +27,9 @@ public:
         chartView->update();
     };
 
+
+
+
 protected:
     // Данные функции должны быть переопределены наследниками в зависимости от их предпочтений
     virtual void PrepareData(QChartView* chartView, const QList<QPair<QString, qreal>>& data) = 0;
@@ -47,27 +43,41 @@ class BarChartDrawer : public ChartDrawer
 protected:
     void PrepareData(QChartView* chartView, const QList<QPair<QString, qreal>>& data)
     {
-        qreal minValue = std::numeric_limits<qreal>::max();
-        qreal maxValue = std::numeric_limits<qreal>::lowest();
-
-        // Получение минимального и максимального значения из выборки (пока что не использую, затем добавить отрисовку осей)
-
-
-        // !!!!!пока что отрисовываем 10 первых значений (группировка данных будет рассмотрена позже)!!!!!
-
-
-        QBarSeries *series = new QBarSeries();
-        for (int i = 0; i < 10; ++i) {
-            const QPair<QString, qreal>& pair = data[i];
+        // Создаем два словаря для группировки данных
+        QMap<QString, qreal> groupedData;
+        QMap<QString, int> groupCount;
+        // Группировка данных по месяцам и годам
+        for (const QPair<QString, qreal>& pair : data) {
             QString time = pair.first;
             qreal value = pair.second;
-            QBarSet *barSet = new QBarSet(time);
-            *barSet << value;
-            series->append(barSet);
-            minValue = std::min(minValue, value);
-            maxValue = std::max(maxValue, value);
+
+            // Пример:
+            // time = 01.01.2005 01:00
+            // отсекаем часы
+            // И берем год и месяц в виде
+            // yearMonth  = 2005-01
+
+            // Извлекаем год и месяц из строки времени
+            QStringList dateParts = time.split(" ")[0].split(".");
+            QString yearMonth = dateParts[2] + "-" + dateParts[1];
+
+            // Добавляем взятые значения к словарям
+            groupedData[yearMonth] += value;
+            groupCount[yearMonth]++;
         }
-        chartView->chart()->addSeries(series);
+
+        // Создаем серии и добавляем их на график
+        std::unique_ptr<QBarSeries> series = std::make_unique<QBarSeries>();
+
+        for (const QString& yearMonth : groupedData.keys()) {
+            // Вычисляем среднее значение для каждой группы
+            qreal averageValue = groupedData[yearMonth] / groupCount[yearMonth];
+            std::unique_ptr<QBarSet> barSet = std::make_unique<QBarSet>(yearMonth);
+            *barSet << averageValue;
+            series->append(barSet.release());
+        }
+
+        chartView->chart()->addSeries(series.release());
     }
 
     void ConfigureChart(QChartView* chartView)
