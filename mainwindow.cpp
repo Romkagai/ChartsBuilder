@@ -292,6 +292,9 @@ void MainWindow::onButtonOpenTreeView()
     }
 }
 
+//---------------------------------------------------------------------------------------------------
+
+// Слот для обработки нажатия кнопки "Печать" : сохранение графика
 void MainWindow::onPrintChartButton()
 {
     QString savePath = QFileDialog::getSaveFileName(this, "Сохранить график", "", "PDF (*.pdf)");
@@ -303,15 +306,8 @@ void MainWindow::onPrintChartButton()
     // Создаем экземпляр класса QPainter для рисования на QPdfWriter
     QPainter painter(&pdfWriter);
 
-    // Устанавливаем размер рисунка для сохранения всего графика
-    QSizeF size = chartView->size();
-    chartView->resize(size.toSize());
-
     // Рисуем график на QPainter
     chartView->render(&painter);
-
-    // Восстанавливаем размер рисунка на QChartView
-    chartView->resize(size.toSize());
 
     // Закрываем рисование
     painter.end();
