@@ -61,9 +61,6 @@ public:
         return DataGetterStrategy->GetData(filePath);
     }
 
-
-
-
 private slots:
     void on_selectionTreeChangedSlot(const QItemSelection &selected, const QItemSelection &deselected);
     void on_selectionListChangedSlot(const QItemSelection &selected, const QItemSelection &deselected);
@@ -72,8 +69,6 @@ private slots:
     void onButtonOpenTreeView();
     void onPrintChartButton();
     void closeEvent(QCloseEvent *event);
-
-
 
 private:    
     // Путь до файла
@@ -111,7 +106,6 @@ private:
 
     //Стратегия для взятия данных
     std::shared_ptr<IDataGetterStrategy> DataGetterStrategy;
-
 };
 
 #endif // MAINWINDOW_H
